@@ -121,12 +121,11 @@ col_map, col_info = st.columns([2, 1])
 with col_map:
     st.subheader("🗺️ Takeaway Density Map of London")
     
-    # Create the map with larger circles and better styling
     fig_map = px.scatter_mapbox(
         df,
         lat='lat',
         lon='lon',
-        size='marker_size',  # Use custom size to highlight selected
+        size='marker_size',
         color='takeaway_density_per_1000',
         color_continuous_scale='RdYlGn_r',
         text='BoroughName',
@@ -148,13 +147,12 @@ with col_map:
         labels={'takeaway_density_per_1000': 'Takeaway Density'}
     )
     
-    # Customise the map
+    # Customise the map - FIXED
     fig_map.update_traces(
         marker=dict(
             sizemode='diameter',
             sizeref=1,
-            opacity=0.8,
-            line=dict(width=1, color='white')
+            opacity=0.8
         ),
         textposition='top center',
         textfont=dict(size=10, color='black')
@@ -177,17 +175,15 @@ with col_map:
     )
     
     st.plotly_chart(fig_map, use_container_width=True)
-    
     st.caption("💡 Hover over a borough to see details | Click on the sidebar to select a borough")
 
 with col_info:
     st.subheader("📍 Selected Borough")
     st.markdown(f"### {selected_borough}")
     
-    # Display metrics in a clean layout
     st.markdown(f"""
     <div style="background-color:#f0f2f6; padding:15px; border-radius:10px;">
-        <p><strong>🏪 Takeaway Density:</strong> {borough_data['takeaway_density_per_1000']:.2f} per 1,000 people</p>
+        <p><strong>🏪 Takeaway Density:</strong> {borough_data['takeaway_density_per_1000']:.2f} per 1,000</p>
         <p><strong>📊 IMD Score:</strong> {borough_data['IMD_Score']:.2f}</p>
         <p><strong>⚖️ Obesity Rate:</strong> {borough_data['obesity_rate']:.1f}%</p>
         <p><strong>🏢 Takeaways:</strong> {borough_data['takeaway_count']}</p>
@@ -195,7 +191,6 @@ with col_info:
     </div>
     """, unsafe_allow_html=True)
     
-    # Show rank
     rank_density = df['takeaway_density_per_1000'].rank(ascending=False)
     rank_obesity = df['obesity_rate'].rank(ascending=False)
     
@@ -231,7 +226,6 @@ with col1:
         hover_data=['BoroughName', 'takeaway_count']
     )
     
-    # Highlight selected borough
     fig1.add_trace(
         go.Scatter(
             x=[borough_data['takeaway_density_per_1000']],
@@ -268,7 +262,6 @@ with col2:
         hover_data=['BoroughName']
     )
     
-    # Highlight selected borough
     fig2.add_trace(
         go.Scatter(
             x=[borough_data['IMD_Score']],
@@ -292,8 +285,6 @@ st.markdown("---")
 st.subheader("📊 Takeaway Density by Borough")
 
 df_sorted = df.sort_values('takeaway_density_per_1000', ascending=True)
-
-# Add color for selected borough
 df_sorted['color'] = df_sorted['BoroughName'].apply(
     lambda x: '#FF4444' if x == selected_borough else '#4682B4'
 )
