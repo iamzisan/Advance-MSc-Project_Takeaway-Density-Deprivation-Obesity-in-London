@@ -17,20 +17,6 @@
 
 ---
 
-## 📋 Table of Contents
-
-- [Project Overview](#project-overview)
-- [Research Question](#research-question)
-- [Datasets](#datasets)
-- [Methodology](#methodology)
-- [Key Findings](#key-findings)
-- [Dashboard Features](#dashboard-features)
-- [How to Run Locally](#how-to-run-locally)
-- [Project Structure](#project-structure)
-- [Future Work](#future-work)
-- [References](#references)
-
----
 
 ## 📖 Project Overview
 
@@ -228,22 +214,6 @@ Step 4: Run the Jupyter Notebook
 To explore the full analysis:
 
 jupyter notebook "MSc_Project_Source_Code.ipynb"
-
-
-🔮 Future Work
-Based on the findings and limitations of this study, future research could:
-
-- Use more recent takeaway data – The FHRS data used in this study goes up to 2022. More recent data would reduce the time mismatch with obesity data.
-
-- Analyse at LSOA level – Borough-level aggregation may mask neighbourhood-level effects. Future work could use LSOA-level obesity data if available.
-
-- Consider takeaway quality – Not all takeaways are the same. Differentiating by cuisine type, portion size, or nutritional content could reveal more nuanced relationships.
-
-- Include other food environment factors – Supermarkets, grocery stores, and access to fresh produce also play a role in the food environment.
-
-- Longitudinal analysis – Tracking changes over time could help establish causal relationships.
-
-
 
 
 
