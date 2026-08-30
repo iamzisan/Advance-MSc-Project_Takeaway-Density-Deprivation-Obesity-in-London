@@ -121,57 +121,50 @@ col_map, col_info = st.columns([2, 1])
 with col_map:
     st.subheader("🗺️ Takeaway Density Map of London")
     
-    fig_map = px.scatter_mapbox(
-        df,
-        lat='lat',
-        lon='lon',
-        size='marker_size',
-        color='takeaway_density_per_1000',
-        color_continuous_scale='RdYlGn_r',
-        text='BoroughName',
-        hover_data={
-            'BoroughName': True,
-            'takeaway_density_per_1000': ':.2f',
-            'IMD_Score': ':.1f',
-            'obesity_rate': ':.1f',
-            'takeaway_count': True,
-            'population': True,
-            'lat': False,
-            'lon': False,
-            'marker_size': False,
-            'selected': False
-        },
-        zoom=9.5,
-        center={'lat': 51.5, 'lon': -0.1},
-        title=None,
-        labels={'takeaway_density_per_1000': 'Takeaway Density'}
-    )
+    # ---- FIXED: Removed 'sizemax' ----
+    fig_map = go.Figure()
     
-    # Customise the map - FIXED
-    fig_map.update_traces(
-        marker=dict(
-            sizemode='diameter',
-            sizeref=1,
-            opacity=0.8
-        ),
-        textposition='top center',
-        textfont=dict(size=10, color='black')
+    fig_map.add_trace(
+        go.Scattermapbox(
+            lat=df['lat'],
+            lon=df['lon'],
+            mode='markers+text',
+            marker=dict(
+                size=df['marker_size'],
+                color=df['takeaway_density_per_1000'],
+                colorscale='RdYlGn_r',
+                showscale=True,
+                colorbar=dict(title="Density"),
+                opacity=0.8,
+                sizemode='diameter',
+                sizeref=1,
+                sizemin=5
+            ),
+            text=df['BoroughName'],
+            textposition='top center',
+            textfont=dict(size=10, color='black'),
+            hovertext=df.apply(
+                lambda row: f"<b>{row['BoroughName']}</b><br>" +
+                           f"Takeaway Density: {row['takeaway_density_per_1000']:.2f}<br>" +
+                           f"IMD Score: {row['IMD_Score']:.1f}<br>" +
+                           f"Obesity Rate: {row['obesity_rate']:.1f}%<br>" +
+                           f"Population: {row['population']:,}",
+                axis=1
+            ),
+            hoverinfo='text',
+            name='Boroughs'
+        )
     )
     
     fig_map.update_layout(
-        mapbox_style='open-street-map',
+        mapbox=dict(
+            style='open-street-map',
+            center=dict(lat=51.5, lon=-0.1),
+            zoom=9.5
+        ),
         height=500,
         margin=dict(l=0, r=0, t=0, b=0),
-        coloraxis_colorbar=dict(
-            title="Density",
-            thickness=20,
-            len=0.8
-        ),
-        hoverlabel=dict(
-            bgcolor="white",
-            font_size=12,
-            font_family="Arial"
-        )
+        showlegend=False
     )
     
     st.plotly_chart(fig_map, use_container_width=True)
@@ -204,11 +197,12 @@ with col_info:
 
 st.markdown("---")
 
-# ---- ROW 3: Two Scatter Plots ----
+# ---- ROW 3: Two Scatter Plots with Trendlines ----
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("🏪 Takeaway Density vs Obesity Rate")
+    st.caption("The trendline shows the overall direction. Points are widely scattered, indicating a weak relationship.")
     
     fig1 = px.scatter(
         df,
@@ -219,13 +213,15 @@ with col1:
         color='IMD_Score',
         color_continuous_scale='RdYlGn_r',
         labels={
-            'takeaway_density_per_1000': 'Takeaway Density (per 1,000)',
+            'takeaway_density_per_1000': 'Takeaway Density (per 1,000 people)',
             'obesity_rate': 'Obesity Rate (%)',
             'IMD_Score': 'Deprivation Score'
         },
-        hover_data=['BoroughName', 'takeaway_count']
+        hover_data=['BoroughName', 'takeaway_count'],
+        trendline="ols"
     )
     
+    # Highlight selected borough
     fig1.add_trace(
         go.Scatter(
             x=[borough_data['takeaway_density_per_1000']],
@@ -240,11 +236,12 @@ with col1:
     )
     
     fig1.update_traces(textposition='top center', marker=dict(size=12, opacity=0.7))
-    fig1.update_layout(height=400, showlegend=False)
+    fig1.update_layout(height=450, showlegend=False)
     st.plotly_chart(fig1, use_container_width=True)
 
 with col2:
     st.subheader("📉 Deprivation vs Obesity Rate")
+    st.caption("The trendline shows a very weak positive slope. Deprivation alone does not explain obesity.")
     
     fig2 = px.scatter(
         df,
@@ -259,7 +256,8 @@ with col2:
             'obesity_rate': 'Obesity Rate (%)',
             'takeaway_density_per_1000': 'Takeaway Density'
         },
-        hover_data=['BoroughName']
+        hover_data=['BoroughName'],
+        trendline="ols"
     )
     
     fig2.add_trace(
@@ -276,7 +274,7 @@ with col2:
     )
     
     fig2.update_traces(textposition='top center', marker=dict(size=12, opacity=0.7))
-    fig2.update_layout(height=400, showlegend=False)
+    fig2.update_layout(height=450, showlegend=False)
     st.plotly_chart(fig2, use_container_width=True)
 
 st.markdown("---")
@@ -297,7 +295,7 @@ fig3 = px.bar(
     color='color',
     color_discrete_map={'#FF4444': '#FF4444', '#4682B4': '#4682B4'},
     labels={
-        'takeaway_density_per_1000': 'Takeaway Density (per 1,000)',
+        'takeaway_density_per_1000': 'Takeaway Density (per 1,000 people)',
         'BoroughName': ''
     },
     hover_data=['takeaway_count', 'population', 'obesity_rate']
