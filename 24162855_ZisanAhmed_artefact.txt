@@ -1,0 +1,1738 @@
+
+# Source Code From Jupyter Notebook
+
+# Import all necessary libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import warnings
+warnings.filterwarnings('ignore')
+
+# For regression and statistics
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+from statsmodels.stats.diagnostic import het_breuschpagan
+from statsmodels.stats.stattools import durbin_watson
+from scipy import stats
+
+# For dashboard
+import plotly.express as px
+import plotly.graph_objects as go
+
+# Display settings
+pd.set_option('display.max_columns', 50)
+pd.set_option('display.max_rows', 30)
+
+print("✅ All libraries imported successfully.")
+print(f"Pandas version: {pd.__version__}")
+print(f"NumPy version: {np.__version__}")
+
+
+
+
+
+
+
+
+
+# Load the FHRS ratings file
+# Update this path to where you saved the file
+fhrs_df = pd.read_csv('/Users/zisan/My Docs/Projects and Research(Git)/MSC Project/Datasets/food_hygiene_rating_data.csv')
+
+print("="*60)
+print("FHRS RATINGS DATASET - BASIC INFO")
+print("="*60)
+print(f"Shape: {fhrs_df.shape[0]:,} rows, {fhrs_df.shape[1]} columns")
+print(f"Memory usage: {fhrs_df.memory_usage(deep=True).sum() / 1024**2:.2f} MB")
+
+print("\nColumn names:")
+print(fhrs_df.columns.tolist())
+
+print("\nFirst 5 rows:")
+fhrs_df.head(20)
+
+
+
+
+
+
+
+
+
+# Check how recent the data is
+print("="*60)
+print("DATA RECENCY CHECK")
+print("="*60)
+
+if 'RatingDate' in fhrs_df.columns:
+    # Convert to datetime
+    fhrs_df['RatingDate'] = pd.to_datetime(fhrs_df['RatingDate'], errors='coerce')
+    
+    latest_date = fhrs_df['RatingDate'].max()
+    earliest_date = fhrs_df['RatingDate'].min()
+    
+    print(f"Earliest rating date: {earliest_date.date()}")
+    print(f"Latest rating date: {latest_date.date()}")
+    
+    # Calculate how old the data is
+    from datetime import datetime
+    today = datetime.now()
+    months_old = (today - latest_date).days / 30
+    
+    if months_old < 6:
+        print(f"✅ Data is RECENT (only {months_old:.1f} months old)")
+    elif months_old < 12:
+        print(f"⚠️ Data is ACCEPTABLE ({months_old:.1f} months old)")
+    else:
+        print(f"❌ Data is OUTDATED ({months_old:.1f} months old)")
+else:
+    print("⚠️ RatingDate column not found - cannot check recency")
+
+
+
+
+
+
+
+
+
+# Load ONSPD data with correct column names
+onspd_df = pd.read_csv('/Users/zisan/My Docs/Projects and Research(Git)/MSC Project/Datasets/ONSPD_FEB_2026_UK.csv')
+
+print("="*60)
+print("ONSPD DATASET - BASIC INFO")
+print("="*60)
+print(f"Shape: {onspd_df.shape[0]:,} rows, {onspd_df.shape[1]} columns")
+
+# Check column names
+print("\nONSPD Columns (first 10):")
+print(onspd_df.columns[:10].tolist())
+
+# Use the actual column names from your file
+onspd_clean = onspd_df[['pcds', 'lsoa11cd', 'lad25cd']].copy()
+
+# Rename to standard names
+onspd_clean.rename(columns={
+    'pcds': 'PostCode',
+    'lsoa11cd': 'LSOA11',
+    'lad25cd': 'LocalAuthorityCode'
+}, inplace=True)
+
+print(f"\nColumns retained: PostCode, LSOA11, LocalAuthorityCode")
+print(f"Unique LSOAs: {onspd_clean['LSOA11'].nunique():,}")
+print(f"Unique local authority codes: {onspd_clean['LocalAuthorityCode'].nunique():,}")
+
+print("\nFirst 5 rows:")
+onspd_clean.head()
+
+
+
+
+
+
+
+# Check ONSPD column names
+print("ONSPD Columns:")
+print(onspd_df.columns.tolist())
+onspd_df.head(10)
+
+
+
+
+
+
+# Load IMD File 7
+imd_df = pd.read_csv('/Users/zisan/My Docs/Projects and Research(Git)/MSC Project/Datasets/File_7_-_All_IoD2019_Scores__Ranks__Deciles_and_Population_Denominators_3 (1).csv')
+
+print("="*60)
+print("IMD DATASET - BASIC INFO")
+print("="*60)
+print(f"Shape: {imd_df.shape[0]:,} rows, {imd_df.shape[1]} columns")
+
+# Find LSOA and IMD columns
+lsoa_col = [col for col in imd_df.columns if 'LSOA' in col][0]
+imd_col = [col for col in imd_df.columns if 'IMD' in col and 'Score' in col][0]
+
+# Keep only needed columns
+imd_clean = imd_df[[lsoa_col, imd_col]].copy()
+imd_clean.rename(columns={lsoa_col: 'LSOA11', imd_col: 'IMD_Score'}, inplace=True)
+
+print(f"\nUsing LSOA column: {lsoa_col}")
+print(f"Using IMD Score column: {imd_col}")
+print(f"IMD Score range: {imd_clean['IMD_Score'].min():.2f} to {imd_clean['IMD_Score'].max():.2f}")
+print(f"Mean IMD Score: {imd_clean['IMD_Score'].mean():.2f}")
+
+imd_df.head(10)
+
+
+
+
+
+
+
+
+# Load adult obesity data 
+obesity_df = pd.read_csv('/Users/zisan/My Docs/Projects and Research(Git)/MSC Project/Datasets/indicator-93088-all-areas.data.csv')
+
+print("="*60)
+print("ADULT OBESITY DATASET - BASIC INFO")
+print("="*60)
+print(f"Shape: {obesity_df.shape[0]:,} rows, {obesity_df.shape[1]} columns")
+
+print("\nColumn names:")
+print(obesity_df.columns.tolist())
+
+# Filter for adult obesity
+obesity_filtered = obesity_df[
+    obesity_df['Indicator Name'].str.contains('Overweight.*obesity', case=False, na=False) |
+    obesity_df['Indicator Name'].str.contains('adult', case=False, na=False)
+]
+
+print(f"\nRows after filtering: {len(obesity_filtered)}")
+
+# Keep only needed columns - FIXED: 'Area Name' (with a space)
+obesity_clean = obesity_filtered[['Area Code', 'Area Name', 'Value', 'Time period']].copy()
+obesity_clean.rename(columns={
+    'Area Name': 'Borough',
+    'Value': 'obesity_rate'
+}, inplace=True)
+
+# Filter for London boroughs
+london_codes = [f'E090000{i:02d}' for i in range(1, 34)]
+obesity_london = obesity_clean[obesity_clean['Area Code'].isin(london_codes)]
+
+print(f"\n✅ London boroughs with obesity data: {len(obesity_london)}")
+print("\nFirst 10 rows:")
+obesity_london.head(10)
+
+
+
+
+
+
+
+
+# Check obesity column names
+print("Obesity Columns:")
+print(obesity_df.columns.tolist())
+
+# Show all data to understand structure
+obesity_df.head(10)
+
+
+
+
+
+
+
+
+# Load population data from Excel - CORRECTED
+population_df = pd.read_excel(
+    '/Users/zisan/My Docs/Projects and Research(Git)/MSC Project/Datasets/mye24tablesew.xlsx',
+    sheet_name='MYE2 - Persons',
+    header=7  # Column names are on row 7
+)
+
+print("="*60)
+print("POPULATION DATASET - BASIC INFO")
+print("="*60)
+print(f"Shape: {population_df.shape[0]:,} rows, {population_df.shape[1]} columns")
+
+print("\nColumn names:")
+print(population_df.columns.tolist())
+
+print("\nFirst 10 rows:")
+population_df.head(10)
+
+# Find the right columns
+area_code_col = [col for col in population_df.columns if 'code' in col.lower()][0]
+area_name_col = [col for col in population_df.columns if 'name' in col.lower()][0]
+pop_col = [col for col in population_df.columns if 'all ages' in col.lower() or 'total' in col.lower()][0]
+
+print(f"\nUsing columns:")
+print(f"  Area Code: {area_code_col}")
+print(f"  Area Name: {area_name_col}")
+print(f"  Population: {pop_col}")
+
+# Create clean dataset
+population_clean = pd.DataFrame({
+    'Area Code': population_df[area_code_col],
+    'Borough': population_df[area_name_col],
+    'Population': population_df[pop_col]
+})
+
+# Filter for London boroughs
+london_codes = [f'E090000{i:02d}' for i in range(1, 34)]
+population_london = population_clean[population_clean['Area Code'].isin(london_codes)]
+
+print(f"\nLondon boroughs: {len(population_london)}")
+print("\nPopulation data:")
+population_london
+
+
+
+
+
+
+
+
+# Data Cleaning
+
+# Keywords to identify takeaways
+takeaway_keywords = [
+    'Takeaway', 'Fast Food', 'Sandwich', 'Kebab',
+    'Burger', 'Pizza', 'Fried Chicken', 'Mobile'
+]
+
+# Create a mask (True/False) for takeaway businesses
+mask = fhrs_df['BusinessType'].str.contains(
+    '|'.join(takeaway_keywords),
+    case=False,
+    na=False
+)
+
+# Keep only takeaways
+takeaways = fhrs_df[mask].copy()
+
+print("="*60)
+print("FILTERING FOR TAKEAWAY BUSINESSES")
+print("="*60)
+print(f"Total food businesses in London: {len(fhrs_df):,}")
+print(f"Takeaway businesses in London: {len(takeaways):,}")
+print(f"Percentage that are takeaways: {len(takeaways)/len(fhrs_df)*100:.1f}%")
+
+# Show the most common business types among takeaways
+print("\nTop 5 Business Types (Takeaways only):")
+print(takeaways['BusinessType'].value_counts().head(5))
+
+# Check if we have postcodes
+print(f"\nTakeaways with postcodes: {takeaways['PostCode'].notna().sum():,}")
+print(f"Takeaways without postcodes: {takeaways['PostCode'].isna().sum():,}")
+
+# Remove takeaways with missing postcodes (we need them for mapping)
+takeaways_clean = takeaways[takeaways['PostCode'].notna()].copy()
+print(f"\nTakeaways after removing missing postcodes: {len(takeaways_clean):,}")
+
+# Clean postcodes (remove spaces and make uppercase for better matching)
+takeaways_clean['PostCode_clean'] = takeaways_clean['PostCode'].str.strip().str.upper()
+
+print("\n✅ Takeaways filtered and ready for integration!")
+
+
+
+
+
+
+
+
+print("="*60)
+print("CONNECTING POSTCODES TO LSOAs AND BOROUGHS")
+print("="*60)
+
+# FIRST: Check what columns we have in onspd_clean
+print("Columns in onspd_clean:", onspd_clean.columns.tolist())
+
+# Clean ONSPD postcodes for matching
+onspd_clean['PostCode_clean'] = onspd_clean['PostCode'].str.strip().str.upper()
+
+# Clean takeaways postcodes (already done, but let's make sure)
+takeaways_clean['PostCode_clean'] = takeaways_clean['PostCode'].str.strip().str.upper()
+
+# IMPORTANT: Drop the old LocalAuthorityCode from takeaways to avoid column conflict
+# The FHRS has a column called 'LocalAuthorityCode' but it's NOT the same as ONSPD codes
+# We don't need it, so we drop it before merging
+takeaways_for_merge = takeaways_clean.drop(columns=['LocalAuthorityCode'], errors='ignore')
+
+# Join takeaways with ONSPD
+merged = takeaways_for_merge.merge(
+    onspd_clean[['PostCode_clean', 'LSOA11', 'LocalAuthorityCode']],
+    on='PostCode_clean',
+    how='left'
+)
+
+print(f"\nTakeaways before merge: {len(takeaways_for_merge):,}")
+print(f"Takeaways after merge: {len(merged):,}")
+
+# Check how many were successfully matched
+matched = merged['LSOA11'].notna().sum()
+print(f"\nSuccessfully matched to an LSOA: {matched:,} ({matched/len(merged)*100:.1f}%)")
+
+# Check how many are in London boroughs
+london_codes = [f'E090000{i:02d}' for i in range(1, 34)]
+london_matched = merged[merged['LocalAuthorityCode'].isin(london_codes)]
+print(f"Matched to London boroughs: {len(london_matched):,}")
+
+# Keep only the London matches
+merged_london = london_matched
+
+# Check what we have
+print(f"\nUnique LSOAs with takeaways: {merged_london['LSOA11'].nunique():,}")
+print(f"Unique boroughs: {merged_london['LocalAuthorityCode'].nunique():,}")
+
+print("\n✅ Postcodes successfully connected to LSOAs and boroughs!")
+
+
+
+
+
+
+
+
+
+# Check what columns are in merged after the merge
+print("="*60)
+print("CHECKING MERGED DATAFRAME COLUMNS")
+print("="*60)
+print("Columns in merged:")
+print(merged.columns.tolist())
+print(f"\nTotal columns: {len(merged.columns)}")
+
+
+
+
+
+
+
+
+
+
+print("="*60)
+print("COUNTING TAKEAWAYS PER LSOA")
+print("="*60)
+
+# Count takeaways per LSOA
+takeaway_per_lsoa = merged_london.groupby('LSOA11').size().reset_index(name='takeaway_count')
+
+print(f"Number of LSOAs with at least one takeaway: {len(takeaway_per_lsoa):,}")
+
+# Show distribution
+print("\nTakeaway count distribution:")
+print(takeaway_per_lsoa['takeaway_count'].describe())
+
+# Show the top 5 LSOAs with most takeaways
+print("\nTop 5 LSOAs by takeaway count:")
+print(takeaway_per_lsoa.nlargest(5, 'takeaway_count'))
+
+# Show LSOAs with 0 takeaways (these are in our data but have no takeaways)
+# We'll add these later when merging with IMD data
+
+print("\n✅ Takeaway counts per LSOA calculated!")
+
+
+
+
+
+
+
+
+
+
+print("="*60)
+print("ADDING DEPRIVATION SCORES")
+print("="*60)
+
+# Takeaway per LSOA data
+print(f"LSOAs with takeaway counts: {len(takeaway_per_lsoa):,}")
+
+# IMD data
+print(f"LSOAs with IMD scores: {len(imd_clean):,}")
+
+# Join with IMD scores
+lsoa_with_imd = takeaway_per_lsoa.merge(
+    imd_clean[['LSOA11', 'IMD_Score']],
+    on='LSOA11',
+    how='left'
+)
+
+print(f"\nLSOAs after adding IMD scores: {len(lsoa_with_imd):,}")
+
+# Check missing IMD scores
+missing_imd = lsoa_with_imd['IMD_Score'].isnull().sum()
+print(f"LSOAs with missing IMD scores: {missing_imd}")
+
+# Show some examples
+print("\nSample of LSOA data with IMD scores:")
+print(lsoa_with_imd.head(10))
+
+print("\n✅ Deprivation scores added successfully!")
+
+
+
+
+
+
+
+
+
+print("="*60)
+print("AGGREGATING TO BOROUGH LEVEL")
+print("="*60)
+
+# First, get borough information for each LSOA
+# Use ONSPD to map LSOA to borough code
+lsoa_to_borough = onspd_clean[['LSOA11', 'LocalAuthorityCode']].drop_duplicates('LSOA11')
+
+# Add borough to LSOA data
+lsoa_with_borough = lsoa_with_imd.merge(
+    lsoa_to_borough,
+    on='LSOA11',
+    how='left'
+)
+
+# Check missing boroughs
+missing_borough = lsoa_with_borough['LocalAuthorityCode'].isnull().sum()
+print(f"LSOAs with missing borough codes: {missing_borough}")
+
+# Remove rows with missing borough (they're not in London)
+lsoa_with_borough = lsoa_with_borough[lsoa_with_borough['LocalAuthorityCode'].notna()]
+
+# Aggregate to borough level
+borough_data = lsoa_with_borough.groupby('LocalAuthorityCode').agg({
+    'takeaway_count': 'sum',
+    'IMD_Score': 'mean'
+}).reset_index()
+
+print(f"Number of boroughs: {len(borough_data)}")
+
+print("\nBorough data (first 5 rows):")
+borough_data.head()
+
+print("\n✅ Data aggregated to borough level!")
+
+
+
+
+
+
+
+
+print("="*60)
+print("ADDING POPULATION DATA")
+print("="*60)
+
+# Population data
+print(f"Population data shape: {population_london.shape}")
+print(population_london.head(5))
+
+# Rename population columns for merging
+population_london_clean = population_london.rename(columns={
+    'Area Code': 'LocalAuthorityCode',
+    'Borough': 'BoroughName',
+    'Population': 'population'
+})
+
+# Merge with borough data
+borough_with_pop = borough_data.merge(
+    population_london_clean[['LocalAuthorityCode', 'BoroughName', 'population']],
+    on='LocalAuthorityCode',
+    how='left'
+)
+
+print(f"\nBoroughs with population data: {borough_with_pop['population'].notna().sum()}")
+
+# Check for missing population
+missing_pop = borough_with_pop['population'].isnull().sum()
+if missing_pop > 0:
+    print(f"⚠️ {missing_pop} boroughs missing population data")
+    borough_with_pop = borough_with_pop.dropna(subset=['population'])
+
+print(f"\nBorough data with population (first 5 rows):")
+borough_with_pop.head()
+
+print("\n✅ Population data added successfully!")
+
+
+
+
+
+
+
+print("="*60)
+print("CALCULATING TAKEAWAY DENSITY")
+print("="*60)
+
+# Calculate density
+borough_with_pop['takeaway_density_per_1000'] = (
+    borough_with_pop['takeaway_count'] / borough_with_pop['population']
+) * 1000
+
+print("Takeaway density statistics:")
+print(borough_with_pop['takeaway_density_per_1000'].describe())
+
+# Show the highest and lowest density boroughs
+print("\nTop 5 boroughs by takeaway density:")
+print(borough_with_pop.nlargest(5, 'takeaway_density_per_1000')[['BoroughName', 'takeaway_density_per_1000', 'takeaway_count', 'population']])
+
+print("\nBottom 5 boroughs by takeaway density:")
+print(borough_with_pop.nsmallest(5, 'takeaway_density_per_1000')[['BoroughName', 'takeaway_density_per_1000', 'takeaway_count', 'population']])
+
+print("\n✅ Takeaway density calculated successfully!")
+
+
+
+
+
+
+
+
+print("="*60)
+print("ADDING OBESITY DATA - FINAL STEP!")
+print("="*60)
+
+# Get the latest obesity data for each borough (most recent year)
+# First, check what years we have
+print("\nAvailable time periods in obesity data:")
+print(obesity_london['Time period'].unique())
+
+# Get the most recent year for each borough
+obesity_latest = obesity_london.sort_values('Time period').groupby('Area Code').last().reset_index()
+
+print(f"\nLatest obesity data for {len(obesity_latest)} boroughs")
+
+# Rename columns for merging
+obesity_latest_clean = obesity_latest.rename(columns={
+    'Area Code': 'LocalAuthorityCode',
+    'Borough': 'BoroughName',
+    'obesity_rate': 'obesity_rate'
+})
+
+# Merge with our data
+final_data = borough_with_pop.merge(
+    obesity_latest_clean[['LocalAuthorityCode', 'obesity_rate']],
+    on='LocalAuthorityCode',
+    how='left'
+)
+
+print(f"\nFinal dataset shape: {final_data.shape[0]} rows, {final_data.shape[1]} columns")
+
+# Check for missing obesity data
+missing_obesity = final_data['obesity_rate'].isnull().sum()
+if missing_obesity > 0:
+    print(f"⚠️ {missing_obesity} boroughs missing obesity data")
+
+print("\n✅ FINAL DATASET CREATED!")
+
+# Show the final dataset
+print("\nFinal dataset (first 10 rows):")
+final_data[['BoroughName', 'takeaway_count', 'population', 'takeaway_density_per_1000', 'IMD_Score', 'obesity_rate']].head(10)
+
+# Save for later use
+final_data.to_csv('london_borough_final_data.csv', index=False)
+print("\n✅ Final dataset saved to 'london_borough_final_data.csv'")
+
+
+
+
+
+
+# Exploratory Data Analysis (EDA)
+
+
+# ============================================================
+# 4.1: Load the Final Dataset
+# ============================================================
+
+# Load the dataset we saved earlier
+final_data = pd.read_csv('/Users/zisan/My Docs/Projects and Research(Git)/MSC Project/Advance-MSc-Project_Takeaway-Density-Deprivation-Obesity-in-London/london_borough_final_data.csv')
+
+print("="*60)
+print("FINAL DATASET LOADED SUCCESSFULLY!")
+print("="*60)
+print(f"Shape: {final_data.shape[0]} rows, {final_data.shape[1]} columns")
+
+print("\nColumn names:")
+print(final_data.columns.tolist())
+
+print("\nFirst 30 rows:")
+final_data.head(30)
+
+
+
+
+
+
+
+print("="*60)
+print("SUMMARY STATISTICS")
+print("="*60)
+
+# Select only numeric columns
+numeric_cols = ['takeaway_count', 'population', 'takeaway_density_per_1000', 'IMD_Score', 'obesity_rate']
+summary = final_data[numeric_cols].describe()
+
+print(summary)
+
+# Let's also check for missing values
+print("\n" + "="*60)
+print("MISSING VALUES CHECK")
+print("="*60)
+print(final_data[numeric_cols].isnull().sum())
+
+
+
+
+
+
+
+print("="*60)
+print("CORRELATION MATRIX")
+print("="*60)
+
+# Select variables for correlation
+corr_vars = ['takeaway_density_per_1000', 'IMD_Score', 'obesity_rate']
+corr_matrix = final_data[corr_vars].corr()
+
+print("Correlation Matrix:")
+print(corr_matrix)
+
+# Visualise the correlation matrix
+plt.figure(figsize=(8, 6))
+sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', center=0, fmt='.3f', 
+            square=True, linewidths=0.5)
+plt.title('Correlation Matrix: Takeaways, Deprivation & Obesity', fontsize=14)
+plt.tight_layout()
+plt.savefig('correlation_matrix.png', dpi=150)
+plt.show()
+
+print("\n✅ Correlation matrix saved as 'correlation_matrix.png'")
+
+# Simple interpretation
+print("\n" + "="*60)
+print("INTERPRETATION")
+print("="*60)
+
+if corr_matrix.loc['takeaway_density_per_1000', 'obesity_rate'] > 0.3:
+    print("✅ Takeaway density has a POSITIVE correlation with obesity rate.")
+    print("   This supports Hypothesis 1: More takeaways = More obesity")
+else:
+    print("⚠️ Takeaway density has a WEAK correlation with obesity rate.")
+    print("   This does NOT strongly support Hypothesis 1")
+
+if corr_matrix.loc['IMD_Score', 'obesity_rate'] > 0.4:
+    print("✅ Deprivation has a STRONG POSITIVE correlation with obesity rate.")
+    print("   This supports that poverty is strongly linked to obesity")
+
+if corr_matrix.loc['takeaway_density_per_1000', 'IMD_Score'] > 0.3:
+    print("✅ Takeaway density is POSITIVELY correlated with deprivation.")
+    print("   Poorer areas have more takeaways!")
+
+
+
+
+
+
+
+# Create three scatter plots
+fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+# Plot 1: Takeaway density vs Obesity
+ax = axes[0]
+ax.scatter(final_data['takeaway_density_per_1000'], final_data['obesity_rate'], alpha=0.7)
+ax.set_xlabel('Takeaway Density (per 1,000 people)')
+ax.set_ylabel('Obesity Rate (%)')
+ax.set_title('Takeaway Density vs Obesity Rate')
+
+# Add labels for each borough
+for i, row in final_data.iterrows():
+    ax.annotate(row['BoroughName'], 
+                (row['takeaway_density_per_1000'], row['obesity_rate']),
+                fontsize=7, alpha=0.6)
+
+# Plot 2: IMD Score vs Obesity
+ax = axes[1]
+ax.scatter(final_data['IMD_Score'], final_data['obesity_rate'], alpha=0.7, color='red')
+ax.set_xlabel('IMD Score (Deprivation)')
+ax.set_ylabel('Obesity Rate (%)')
+ax.set_title('Deprivation vs Obesity Rate')
+
+for i, row in final_data.iterrows():
+    ax.annotate(row['BoroughName'], 
+                (row['IMD_Score'], row['obesity_rate']),
+                fontsize=7, alpha=0.6)
+
+# Plot 3: Takeaway density vs IMD Score
+ax = axes[2]
+ax.scatter(final_data['takeaway_density_per_1000'], final_data['IMD_Score'], alpha=0.7, color='green')
+ax.set_xlabel('Takeaway Density (per 1,000 people)')
+ax.set_ylabel('IMD Score (Deprivation)')
+ax.set_title('Takeaway Density vs Deprivation')
+
+for i, row in final_data.iterrows():
+    ax.annotate(row['BoroughName'], 
+                (row['takeaway_density_per_1000'], row['IMD_Score']),
+                fontsize=7, alpha=0.6)
+
+plt.tight_layout()
+plt.savefig('scatter_plots.png', dpi=150)
+plt.show()
+
+print("✅ Scatter plots saved as 'scatter_plots.png'")
+
+
+
+
+
+
+
+
+
+print("="*60)
+print("TOP 5 BOROUGHS BY TAKEAWAY DENSITY")
+print("="*60)
+top_density = final_data.nlargest(5, 'takeaway_density_per_1000')
+print(top_density[['BoroughName', 'takeaway_density_per_1000', 'IMD_Score', 'obesity_rate']])
+
+print("\n" + "="*60)
+print("BOTTOM 5 BOROUGHS BY TAKEAWAY DENSITY")
+print("="*60)
+bottom_density = final_data.nsmallest(5, 'takeaway_density_per_1000')
+print(bottom_density[['BoroughName', 'takeaway_density_per_1000', 'IMD_Score', 'obesity_rate']])
+
+print("\n" + "="*60)
+print("TOP 5 BOROUGHS BY OBESITY RATE")
+print("="*60)
+top_obesity = final_data.nlargest(5, 'obesity_rate')
+print(top_obesity[['BoroughName', 'obesity_rate', 'takeaway_density_per_1000', 'IMD_Score']])
+
+print("\n" + "="*60)
+print("BOTTOM 5 BOROUGHS BY OBESITY RATE")
+print("="*60)
+bottom_obesity = final_data.nsmallest(5, 'obesity_rate')
+print(bottom_obesity[['BoroughName', 'obesity_rate', 'takeaway_density_per_1000', 'IMD_Score']])
+
+
+
+
+
+
+
+
+
+# Visualising All Boroughs
+
+# Sort by density
+final_data_sorted = final_data.sort_values('takeaway_density_per_1000', ascending=False)
+
+plt.figure(figsize=(14, 8))
+bars = plt.bar(final_data_sorted['BoroughName'], 
+              final_data_sorted['takeaway_density_per_1000'],
+              color='skyblue', edgecolor='black')
+
+plt.title('Takeaway Density by London Borough', fontsize=14)
+plt.xlabel('Borough')
+plt.ylabel('Takeaways per 1,000 Residents')
+plt.xticks(rotation=90, fontsize=8)
+
+# Add value labels on bars
+for bar in bars:
+    height = bar.get_height()
+    plt.text(bar.get_x() + bar.get_width()/2., height + 0.1,
+             f'{height:.2f}', ha='center', va='bottom', fontsize=7)
+
+plt.tight_layout()
+plt.savefig('borough_comparison.png', dpi=150)
+plt.show()
+
+print("✅ Bar chart saved as 'borough_comparison.png'")
+
+
+
+
+
+
+
+
+
+print("="*60)
+print("KEY FINDINGS SUMMARY")
+print("="*60)
+
+# Calculate key metrics
+avg_density = final_data['takeaway_density_per_1000'].mean()
+avg_obesity = final_data['obesity_rate'].mean()
+avg_imd = final_data['IMD_Score'].mean()
+
+corr_density_obesity = final_data['takeaway_density_per_1000'].corr(final_data['obesity_rate'])
+corr_imd_obesity = final_data['IMD_Score'].corr(final_data['obesity_rate'])
+
+print(f"""
+📊 Overall Statistics:
+   - Average takeaway density: {avg_density:.2f} per 1,000 people
+   - Average obesity rate: {avg_obesity:.2f}%
+   - Average IMD Score: {avg_imd:.2f}
+
+📈 Correlations:
+   - Takeaway density vs Obesity: {corr_density_obesity:.3f}
+   - Deprivation vs Obesity: {corr_imd_obesity:.3f}
+
+🏆 Borough with highest takeaway density: {final_data.loc[final_data['takeaway_density_per_1000'].idxmax(), 'BoroughName']}
+   ({final_data['takeaway_density_per_1000'].max():.2f} per 1,000)
+
+🏆 Borough with lowest takeaway density: {final_data.loc[final_data['takeaway_density_per_1000'].idxmin(), 'BoroughName']}
+   ({final_data['takeaway_density_per_1000'].min():.2f} per 1,000)
+
+🏆 Borough with highest obesity rate: {final_data.loc[final_data['obesity_rate'].idxmax(), 'BoroughName']}
+   ({final_data['obesity_rate'].max():.2f}%)
+
+🏆 Borough with lowest obesity rate: {final_data.loc[final_data['obesity_rate'].idxmin(), 'BoroughName']}
+   ({final_data['obesity_rate'].min():.2f}%)
+""")
+
+print("\n" + "="*60)
+print("HYPOTHESIS CHECK")
+print("="*60)
+
+if corr_density_obesity > 0.3:
+    print("✅ Hypothesis 1 (More takeaways = More obesity) is SUPPORTED")
+    print(f"   Correlation: {corr_density_obesity:.3f}")
+else:
+    print("⚠️ Hypothesis 1 is WEAKLY supported or not supported")
+    print(f"   Correlation: {corr_density_obesity:.3f}")
+
+if corr_imd_obesity > 0.4:
+    print("✅ Deprivation is strongly correlated with obesity")
+    print(f"   Correlation: {corr_imd_obesity:.3f}")
+    
+    if corr_density_obesity < corr_imd_obesity:
+        print("✅ Deprivation is a STRONGER predictor than takeaways")
+        print("   This supports Hypothesis 2: Deprivation is the real driver")
+    else:
+        print("⚠️ Takeaways are still stronger than deprivation")
+else:
+    print("⚠️ Deprivation correlation is weaker than expected")
+
+
+
+
+
+
+
+
+
+
+
+
+
+print("\n5.1 Takeaway Count Trends in London Over Time")
+
+# Check if RatingDate column exists and is datetime
+if 'RatingDate' in fhrs_df.columns:
+    # Ensure datetime
+    fhrs_df['RatingDate'] = pd.to_datetime(fhrs_df['RatingDate'], errors='coerce')
+    # Extract year
+    fhrs_df['Year'] = fhrs_df['RatingDate'].dt.year
+    
+    # Filter for London boroughs (using LocalAuthorityName)
+    # We have a list of London borough names from final_data
+    london_boroughs = final_data['BoroughName'].unique()
+    fhrs_london = fhrs_df[fhrs_df['LocalAuthorityName'].isin(london_boroughs)]
+    
+    # Count takeaways per year (only those with valid year)
+    takeaways_by_year = fhrs_london.groupby('Year').size()
+    # Drop NaN year
+    takeaways_by_year = takeaways_by_year.dropna()
+    
+    print("Takeaway counts per year (London):")
+    print(takeaways_by_year)
+    
+    # Plot
+    plt.figure(figsize=(10, 5))
+    plt.plot(takeaways_by_year.index, takeaways_by_year.values, marker='o', linestyle='-', color='blue')
+    plt.xlabel('Year')
+    plt.ylabel('Number of Takeaways')
+    plt.title('Number of Takeaways in London Over Time')
+    plt.grid(True, alpha=0.3)
+    plt.savefig('takeaway_trend.png', dpi=150)
+    plt.show()
+    print("✅ Saved as 'takeaway_trend.png'")
+    
+    # Statistical test: linear regression to see if trend is significant
+    from scipy import stats
+    years = takeaways_by_year.index.values
+    counts = takeaways_by_year.values
+    slope, intercept, r_value, p_value, std_err = stats.linregress(years, counts)
+    print(f"\nLinear regression of takeaways over time:")
+    print(f"Slope (change per year): {slope:.2f}")
+    print(f"R-squared: {r_value**2:.4f}")
+    print(f"p-value: {p_value:.4f}")
+    if p_value < 0.05:
+        print("✅ The trend is statistically significant (p < 0.05).")
+    else:
+        print("⚠️ The trend is not statistically significant (p >= 0.05).")
+else:
+    print("⚠️ RatingDate column not available, cannot analyze takeaway trends.")
+
+
+
+
+
+
+
+
+print("\n5.2 Obesity Rate Trends Over Time")
+
+if 'Time period' in obesity_london.columns:
+    # We have obesity_london from earlier (filtered for London boroughs)
+    # Extract year (first part of 'Time period' e.g., '2015/16' -> 2015)
+    obesity_london['Year'] = obesity_london['Time period'].str.split('/').str[0].astype(int)
+    
+    # Compute average obesity rate across London boroughs per year
+    obesity_by_year = obesity_london.groupby('Year')['obesity_rate'].mean()
+    print("Average obesity rate per year (London boroughs):")
+    print(obesity_by_year)
+    
+    # Plot
+    plt.figure(figsize=(10, 5))
+    plt.plot(obesity_by_year.index, obesity_by_year.values, marker='s', linestyle='-', color='red')
+    plt.xlabel('Year')
+    plt.ylabel('Average Obesity Rate (%)')
+    plt.title('Average Obesity Rate in London Over Time')
+    plt.grid(True, alpha=0.3)
+    plt.savefig('obesity_trend.png', dpi=150)
+    plt.show()
+    print("✅ Saved as 'obesity_trend.png'")
+    
+    # Statistical test
+    years = obesity_by_year.index.values
+    rates = obesity_by_year.values
+    slope, intercept, r_value, p_value, std_err = stats.linregress(years, rates)
+    print(f"\nLinear regression of obesity over time:")
+    print(f"Slope (change per year): {slope:.4f}")
+    print(f"R-squared: {r_value**2:.4f}")
+    print(f"p-value: {p_value:.4f}")
+    if p_value < 0.05:
+        print("✅ The trend is statistically significant (p < 0.05).")
+    else:
+        print("⚠️ The trend is not statistically significant (p >= 0.05).")
+else:
+    print("⚠️ Time period column not available, cannot analyze obesity trends.")
+
+
+
+
+
+
+# ============================================================
+# Section 5.3: Scatter Plots with Trendline
+# ============================================================
+
+print("="*60)
+print("SCATTER PLOTS WITH TRENDLINE")
+print("="*60)
+
+import numpy as np
+
+# Create figure with 3 subplots
+fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+
+# ============================================================
+# Plot 1: Takeaway Density vs Obesity Rate
+# ============================================================
+
+ax = axes[0]
+
+# Scatter points
+ax.scatter(
+    final_data['takeaway_density_per_1000'], 
+    final_data['obesity_rate'], 
+    alpha=0.7, 
+    s=80,
+    color='#2E86AB',
+    label='Boroughs'
+)
+
+# Add trendline using numpy polyfit
+z = np.polyfit(
+    final_data['takeaway_density_per_1000'], 
+    final_data['obesity_rate'], 
+    1
+)
+p = np.poly1d(z)
+
+# Create sorted values for smooth line
+x_sorted = np.sort(final_data['takeaway_density_per_1000'])
+ax.plot(
+    x_sorted, 
+    p(x_sorted), 
+    color='red', 
+    linewidth=2.5, 
+    label='Trendline'
+)
+
+# Labels and title
+ax.set_xlabel('Takeaway Density (per 1,000 people)', fontsize=11)
+ax.set_ylabel('Obesity Rate (%)', fontsize=11)
+ax.set_title('Takeaway Density vs Obesity Rate', fontsize=12, fontweight='bold')
+
+# Add borough labels
+for i, row in final_data.iterrows():
+    ax.annotate(
+        row['BoroughName'], 
+        (row['takeaway_density_per_1000'], row['obesity_rate']),
+        fontsize=7, 
+        alpha=0.6
+    )
+
+ax.legend()
+ax.grid(True, alpha=0.3)
+
+# ============================================================
+# Plot 2: IMD Score vs Obesity Rate
+# ============================================================
+
+ax = axes[1]
+
+# Scatter points
+ax.scatter(
+    final_data['IMD_Score'], 
+    final_data['obesity_rate'], 
+    alpha=0.7, 
+    s=80,
+    color='#A23B72',
+    label='Boroughs'
+)
+
+# Add trendline
+z = np.polyfit(
+    final_data['IMD_Score'], 
+    final_data['obesity_rate'], 
+    1
+)
+p = np.poly1d(z)
+
+x_sorted = np.sort(final_data['IMD_Score'])
+ax.plot(
+    x_sorted, 
+    p(x_sorted), 
+    color='blue', 
+    linewidth=2.5, 
+    label='Trendline'
+)
+
+# Labels and title
+ax.set_xlabel('IMD Score (Deprivation)', fontsize=11)
+ax.set_ylabel('Obesity Rate (%)', fontsize=11)
+ax.set_title('Deprivation vs Obesity Rate', fontsize=12, fontweight='bold')
+
+# Add borough labels
+for i, row in final_data.iterrows():
+    ax.annotate(
+        row['BoroughName'], 
+        (row['IMD_Score'], row['obesity_rate']),
+        fontsize=7, 
+        alpha=0.6
+    )
+
+ax.legend()
+ax.grid(True, alpha=0.3)
+
+# ============================================================
+# Plot 3: Takeaway Density vs IMD Score
+# ============================================================
+
+ax = axes[2]
+
+# Scatter points
+ax.scatter(
+    final_data['takeaway_density_per_1000'], 
+    final_data['IMD_Score'], 
+    alpha=0.7, 
+    s=80,
+    color='#2C5F2D',
+    label='Boroughs'
+)
+
+# Add trendline
+z = np.polyfit(
+    final_data['takeaway_density_per_1000'], 
+    final_data['IMD_Score'], 
+    1
+)
+p = np.poly1d(z)
+
+x_sorted = np.sort(final_data['takeaway_density_per_1000'])
+ax.plot(
+    x_sorted, 
+    p(x_sorted), 
+    color='red', 
+    linewidth=2.5, 
+    label='Trendline'
+)
+
+# Labels and title
+ax.set_xlabel('Takeaway Density (per 1,000 people)', fontsize=11)
+ax.set_ylabel('IMD Score (Deprivation)', fontsize=11)
+ax.set_title('Takeaway Density vs Deprivation', fontsize=12, fontweight='bold')
+
+# Add borough labels
+for i, row in final_data.iterrows():
+    ax.annotate(
+        row['BoroughName'], 
+        (row['takeaway_density_per_1000'], row['IMD_Score']),
+        fontsize=7, 
+        alpha=0.6
+    )
+
+ax.legend()
+ax.grid(True, alpha=0.3)
+
+# ============================================================
+# Save and Display
+# ============================================================
+
+plt.tight_layout()
+plt.savefig('scatter_plots_with_trendline.png', dpi=150)
+plt.show()
+
+print("✅ Scatter plots with trendline saved as 'scatter_plots_with_trendline.png'")
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Regression Modelling
+
+# ============================================================
+# Section 6.1: Model A - Bivariate Regression
+# ============================================================
+
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+from statsmodels.stats.diagnostic import het_breuschpagan
+from statsmodels.stats.stattools import durbin_watson
+from scipy import stats
+import warnings
+warnings.filterwarnings('ignore')
+
+print("="*60)
+print("MODEL A: BIVARIATE REGRESSION")
+print("Takeaway Density → Obesity Rate")
+print("="*60)
+
+# Prepare data
+X = final_data['takeaway_density_per_1000']
+y = final_data['obesity_rate']
+
+# Add constant (intercept)
+X_with_const = sm.add_constant(X)
+
+# Fit the model
+model_a = sm.OLS(y, X_with_const).fit()
+
+# Print summary
+print(model_a.summary())
+
+# Extract key metrics
+print("\n" + "="*60)
+print("MODEL A - KEY METRICS")
+print("="*60)
+print(f"R-squared: {model_a.rsquared:.4f}")
+print(f"Adjusted R-squared: {model_a.rsquared_adj:.4f}")
+print(f"F-statistic: {model_a.fvalue:.4f}")
+print(f"F-statistic p-value: {model_a.f_pvalue:.4f}")
+print(f"Number of observations: {int(model_a.nobs)}")
+print(f"AIC: {model_a.aic:.2f}")
+print(f"BIC: {model_a.bic:.2f}")
+
+print("\n" + "-"*60)
+print("COEFFICIENTS:")
+print("-"*60)
+print(f"Intercept (β0): {model_a.params[0]:.4f}")
+print(f"Takeaway Density (β1): {model_a.params[1]:.4f}")
+print(f"p-value for β1: {model_a.pvalues[1]:.4f}")
+
+if model_a.pvalues[1] < 0.05:
+    print("✅ The coefficient is statistically significant (p < 0.05).")
+else:
+    print("⚠️ The coefficient is NOT statistically significant (p >= 0.05).")
+
+
+
+
+
+
+
+
+
+
+# ============================================================
+# Section 6.2: Model B - Multivariate Regression
+# ============================================================
+
+print("\n" + "="*60)
+print("MODEL B: MULTIVARIATE REGRESSION")
+print("Takeaway Density + Deprivation → Obesity Rate")
+print("="*60)
+
+# Prepare data
+X_b = final_data[['takeaway_density_per_1000', 'IMD_Score']]
+y_b = final_data['obesity_rate']
+
+# Add constant (intercept)
+X_b_with_const = sm.add_constant(X_b)
+
+# Fit the model
+model_b = sm.OLS(y_b, X_b_with_const).fit()
+
+# Print summary
+print(model_b.summary())
+
+# Extract key metrics
+print("\n" + "="*60)
+print("MODEL B - KEY METRICS")
+print("="*60)
+print(f"R-squared: {model_b.rsquared:.4f}")
+print(f"Adjusted R-squared: {model_b.rsquared_adj:.4f}")
+print(f"F-statistic: {model_b.fvalue:.4f}")
+print(f"F-statistic p-value: {model_b.f_pvalue:.4f}")
+print(f"Number of observations: {int(model_b.nobs)}")
+print(f"AIC: {model_b.aic:.2f}")
+print(f"BIC: {model_b.bic:.2f}")
+
+print("\n" + "-"*60)
+print("COEFFICIENTS:")
+print("-"*60)
+print(f"Intercept (β0): {model_b.params[0]:.4f}")
+print(f"Takeaway Density (β1): {model_b.params[1]:.4f}")
+print(f"p-value for β1: {model_b.pvalues[1]:.4f}")
+print(f"IMD Score (β2): {model_b.params[2]:.4f}")
+print(f"p-value for β2: {model_b.pvalues[2]:.4f}")
+
+if model_b.pvalues[1] < 0.05:
+    print("✅ Takeaway density coefficient is statistically significant (p < 0.05).")
+else:
+    print("⚠️ Takeaway density coefficient is NOT statistically significant (p >= 0.05).")
+
+if model_b.pvalues[2] < 0.05:
+    print("✅ IMD Score coefficient is statistically significant (p < 0.05).")
+else:
+    print("⚠️ IMD Score coefficient is NOT statistically significant (p >= 0.05).")
+
+
+
+
+
+
+
+
+
+# ============================================================
+# Section 6.3: Comparing Models
+# ============================================================
+
+print("\n" + "="*60)
+print("MODEL COMPARISON")
+print("="*60)
+
+print("\n" + "-"*60)
+print("R-squared Comparison:")
+print("-"*60)
+print(f"Model A (Takeaway Density only):  R² = {model_a.rsquared:.4f}")
+print(f"Model B (Takeaway Density + IMD): R² = {model_b.rsquared:.4f}")
+print(f"Improvement: {model_b.rsquared - model_a.rsquared:.4f}")
+
+print("\n" + "-"*60)
+print("Adjusted R-squared Comparison:")
+print("-"*60)
+print(f"Model A (Takeaway Density only):  Adj R² = {model_a.rsquared_adj:.4f}")
+print(f"Model B (Takeaway Density + IMD): Adj R² = {model_b.rsquared_adj:.4f}")
+print(f"Improvement: {model_b.rsquared_adj - model_a.rsquared_adj:.4f}")
+
+print("\n" + "-"*60)
+print("AIC Comparison (lower is better):")
+print("-"*60)
+print(f"Model A: AIC = {model_a.aic:.2f}")
+print(f"Model B: AIC = {model_b.aic:.2f}")
+print(f"Difference: {model_a.aic - model_b.aic:.2f}")
+
+print("\n" + "-"*60)
+print("Coefficient Comparison:")
+print("-"*60)
+print(f"Model A - Takeaway Density coefficient: {model_a.params[1]:.4f} (p={model_a.pvalues[1]:.4f})")
+print(f"Model B - Takeaway Density coefficient: {model_b.params[1]:.4f} (p={model_b.pvalues[1]:.4f})")
+print(f"Change in coefficient: {model_b.params[1] - model_a.params[1]:.4f}")
+
+# Hypothesis test
+if model_a.pvalues[1] < 0.05 and model_b.pvalues[1] < 0.05:
+    print("\n✅ Both models show takeaway density is a significant predictor.")
+    if abs(model_b.params[1]) < abs(model_a.params[1]):
+        print("✅ The coefficient for takeaways DECREASED when deprivation was added.")
+        print("   This suggests that deprivation partially explains the relationship.")
+    else:
+        print("⚠️ The coefficient for takeaways INCREASED when deprivation was added.")
+        print("   This suggests the relationship is not fully explained by deprivation.")
+elif model_a.pvalues[1] < 0.05 and model_b.pvalues[1] >= 0.05:
+    print("\n⚠️ Takeaway density was significant in Model A but NOT in Model B.")
+    print("   This suggests deprivation explains most of the relationship.")
+    print("   This supports Hypothesis 2: Deprivation is the real driver.")
+else:
+    print("\n⚠️ Takeaway density is NOT significant in either model.")
+    print("   This does not support Hypothesis 1.")
+
+
+
+
+
+
+
+
+
+
+
+#Regression Diagnostics
+
+
+# ============================================================
+# Section 7.1: Assumption 1 - Linearity
+# ============================================================
+
+print("\n" + "="*60)
+print("ASSUMPTION 1: LINEARITY")
+print("="*60)
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+# Plot 1: Actual vs Predicted
+axes[0].scatter(model_b.fittedvalues, model_b.resid, alpha=0.7)
+axes[0].axhline(y=0, color='red', linestyle='--')
+axes[0].set_xlabel('Fitted Values (Predicted Obesity Rate)')
+axes[0].set_ylabel('Residuals')
+axes[0].set_title('Actual vs Predicted - Check for Patterns')
+axes[0].grid(True, alpha=0.3)
+
+# Plot 2: Residuals vs Predictors
+axes[1].scatter(final_data['takeaway_density_per_1000'], model_b.resid, alpha=0.7, color='green')
+axes[1].axhline(y=0, color='red', linestyle='--')
+axes[1].set_xlabel('Takeaway Density')
+axes[1].set_ylabel('Residuals')
+axes[1].set_title('Residuals vs Takeaway Density')
+axes[1].grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig('linearity_check.png', dpi=150)
+plt.show()
+
+print("✅ Linearity plots saved as 'linearity_check.png'")
+print("\nInterpretation: If residuals are randomly scattered around zero with no clear pattern, the linearity assumption is satisfied.")
+
+
+
+
+
+
+
+
+# ============================================================
+# Section 7.2: Assumption 2 - Normality of Residuals
+# ============================================================
+
+print("\n" + "="*60)
+print("ASSUMPTION 2: NORMALITY OF RESIDUALS")
+print("="*60)
+
+# Get residuals
+residuals = model_b.resid
+
+# Shapiro-Wilk test
+shapiro_stat, shapiro_p = stats.shapiro(residuals)
+print(f"Shapiro-Wilk Test:")
+print(f"Test statistic: {shapiro_stat:.4f}")
+print(f"p-value: {shapiro_p:.4f}")
+
+if shapiro_p > 0.05:
+    print("✅ Residuals appear to be normally distributed (p > 0.05).")
+else:
+    print("⚠️ Residuals may NOT be normally distributed (p <= 0.05).")
+
+# Q-Q plot
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+# Q-Q plot
+stats.probplot(residuals, dist="norm", plot=axes[0])
+axes[0].set_title('Q-Q Plot of Residuals')
+axes[0].grid(True, alpha=0.3)
+
+# Histogram
+axes[1].hist(residuals, bins=10, edgecolor='black', alpha=0.7)
+axes[1].axvline(x=0, color='red', linestyle='--')
+axes[1].set_xlabel('Residuals')
+axes[1].set_ylabel('Frequency')
+axes[1].set_title('Histogram of Residuals')
+axes[1].grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.savefig('normality_check.png', dpi=150)
+plt.show()
+
+print("✅ Normality plots saved as 'normality_check.png'")
+
+
+
+
+
+
+
+
+
+# ============================================================
+# Section 7.3: Assumption 3 - Homoscedasticity
+# ============================================================
+
+print("\n" + "="*60)
+print("ASSUMPTION 3: HOMOSCEDASTICITY")
+print("="*60)
+
+# Breusch-Pagan test
+bp_test = het_breuschpagan(model_b.resid, model_b.model.exog)
+bp_lm, bp_p, bp_f, bp_f_p = bp_test
+
+print("Breusch-Pagan Test:")
+print(f"LM statistic: {bp_lm:.4f}")
+print(f"p-value: {bp_p:.4f}")
+
+if bp_p > 0.05:
+    print("✅ Homoscedasticity assumption is satisfied (p > 0.05).")
+    print("   The variance of residuals appears constant.")
+else:
+    print("⚠️ Heteroscedasticity may be present (p <= 0.05).")
+    print("   The variance of residuals may not be constant.")
+
+# Residuals vs Fitted plot
+plt.figure(figsize=(10, 6))
+plt.scatter(model_b.fittedvalues, model_b.resid, alpha=0.7)
+plt.axhline(y=0, color='red', linestyle='--')
+plt.xlabel('Fitted Values')
+plt.ylabel('Residuals')
+plt.title('Residuals vs Fitted Values - Homoscedasticity Check')
+plt.grid(True, alpha=0.3)
+plt.savefig('homoscedasticity_check.png', dpi=150)
+plt.show()
+
+print("✅ Homoscedasticity plot saved as 'homoscedasticity_check.png'")
+
+
+
+
+
+
+
+
+
+# ============================================================
+# Section 7.4: Assumption 4 - No Multicollinearity
+# ============================================================
+
+print("\n" + "="*60)
+print("ASSUMPTION 4: NO MULTICOLLINEARITY")
+print("="*60)
+
+# Calculate VIF for each predictor
+X_vif = final_data[['takeaway_density_per_1000', 'IMD_Score']]
+vif_data = pd.DataFrame()
+vif_data['Variable'] = X_vif.columns
+vif_data['VIF'] = [variance_inflation_factor(X_vif.values, i) for i in range(X_vif.shape[1])]
+
+print("Variance Inflation Factor (VIF):")
+print(vif_data.to_string(index=False))
+
+if vif_data['VIF'].max() < 5:
+    print("\n✅ No multicollinearity detected (all VIF < 5).")
+    print("   Predictors are independent of each other.")
+elif vif_data['VIF'].max() < 10:
+    print("\n⚠️ Moderate multicollinearity detected (some VIF between 5 and 10).")
+    print("   This may affect coefficient stability.")
+else:
+    print("\n❌ High multicollinearity detected (some VIF >= 10).")
+    print("   This may indicate redundant predictors.")
+
+
+
+
+
+
+
+
+
+
+# ============================================================
+# Section 7.5: Assumption 5 - Independence of Residuals
+# ============================================================
+
+print("\n" + "="*60)
+print("ASSUMPTION 5: INDEPENDENCE OF RESIDUALS")
+print("="*60)
+
+# Durbin-Watson test
+dw_stat = durbin_watson(model_b.resid)
+print(f"Durbin-Watson Statistic: {dw_stat:.4f}")
+
+# Interpret
+if 1.5 < dw_stat < 2.5:
+    print("✅ No autocorrelation detected (DW between 1.5 and 2.5).")
+    print("   Residuals appear to be independent.")
+elif dw_stat <= 1.5:
+    print("⚠️ Positive autocorrelation may be present (DW <= 1.5).")
+    print("   This suggests residuals are not independent.")
+else:
+    print("⚠️ Negative autocorrelation may be present (DW >= 2.5).")
+    print("   This suggests residuals are not independent.")
+
+# Residuals plot in order
+plt.figure(figsize=(12, 5))
+plt.plot(range(len(model_b.resid)), model_b.resid, marker='o', linestyle='-', alpha=0.7)
+plt.axhline(y=0, color='red', linestyle='--')
+plt.xlabel('Observation Order')
+plt.ylabel('Residuals')
+plt.title('Residuals in Observation Order - Independence Check')
+plt.grid(True, alpha=0.3)
+plt.savefig('independence_check.png', dpi=150)
+plt.show()
+
+print("✅ Independence plot saved as 'independence_check.png'")
+
+
+
+
+
+
+# ============================================================
+# FINAL PROJECT RESULTS 
+# ============================================================
+
+print("="*70)
+print(" "*20 + "FINAL PROJECT RESULTS SUMMARY")
+print("="*70)
+print("\n")
+
+# ---- 1. DATA OVERVIEW ----
+print("1. DATA OVERVIEW")
+print("-"*50)
+print(f"Total boroughs analysed: {len(final_data)}")
+print(f"Time period (Takeaways): 2002 – 2022")
+print(f"Time period (Obesity): 2015 – 2024")
+print(f"Time period (IMD): 2019")
+print("\n")
+
+# ---- 2. KEY STATISTICS ----
+print("2. KEY STATISTICS")
+print("-"*50)
+print(f"Average takeaway density: {final_data['takeaway_density_per_1000'].mean():.2f} per 1,000 people")
+print(f"Average obesity rate: {final_data['obesity_rate'].mean():.1f}%")
+print(f"Average IMD Score: {final_data['IMD_Score'].mean():.2f}")
+print("\n")
+
+print("Top 5 Boroughs by Takeaway Density:")
+print(final_data.nlargest(5, 'takeaway_density_per_1000')[['BoroughName', 'takeaway_density_per_1000']].to_string(index=False))
+print("\n")
+
+print("Top 5 Boroughs by Obesity Rate:")
+print(final_data.nlargest(5, 'obesity_rate')[['BoroughName', 'obesity_rate']].to_string(index=False))
+print("\n")
+
+# ---- 3. REGRESSION RESULTS ----
+print("3. REGRESSION RESULTS")
+print("-"*50)
+
+print("Model A: Takeaway Density → Obesity Rate")
+print(f"  R-squared: {model_a.rsquared:.4f}")
+print(f"  Adjusted R-squared: {model_a.rsquared_adj:.4f}")
+print(f"  p-value: {model_a.pvalues[1]:.4f}")
+print(f"  Coefficient: {model_a.params[1]:.4f}")
+if model_a.pvalues[1] < 0.05:
+    print("  ✅ Statistically significant (p < 0.05)")
+else:
+    print("  ❌ NOT statistically significant (p > 0.05)")
+print("\n")
+
+print("Model B: Takeaway Density + Deprivation → Obesity Rate")
+print(f"  R-squared: {model_b.rsquared:.4f}")
+print(f"  Adjusted R-squared: {model_b.rsquared_adj:.4f}")
+print(f"  Takeaways p-value: {model_b.pvalues[1]:.4f}")
+print(f"  IMD Score p-value: {model_b.pvalues[2]:.4f}")
+print(f"  Takeaways coefficient: {model_b.params[1]:.4f}")
+print(f"  IMD Score coefficient: {model_b.params[2]:.4f}")
+if model_b.pvalues[1] < 0.05:
+    print("  ✅ Takeaways statistically significant")
+else:
+    print("  ❌ Takeaways NOT statistically significant")
+if model_b.pvalues[2] < 0.05:
+    print("  ✅ IMD Score statistically significant")
+else:
+    print("  ❌ IMD Score NOT statistically significant")
+print("\n")
+
+# ---- 4. REGRESSION DIAGNOSTICS ----
+print("4. REGRESSION DIAGNOSTICS")
+print("-"*50)
+print(f"Normality (Shapiro-Wilk): p = {shapiro_p:.4f} {'✅ Pass' if shapiro_p > 0.05 else '❌ Fail'}")
+print(f"Homoscedasticity (Breusch-Pagan): p = {bp_p:.4f} {'✅ Pass' if bp_p > 0.05 else '❌ Fail'}")
+print(f"Multicollinearity (VIF): {vif_data['VIF'].max():.2f} {'✅ Pass' if vif_data['VIF'].max() < 5 else '⚠️ Check'}")
+print(f"Independence (Durbin-Watson): {dw_stat:.4f} {'✅ Pass' if 1.5 < dw_stat < 2.5 else '⚠️ Check'}")
+print("\n")
+
+
+
+# ---- 5. HYPOTHESIS TESTING ----
+print("6. HYPOTHESIS TESTING")
+print("-"*50)
+
+if model_a.pvalues[1] < 0.05:
+    print("✅ H1: Areas with more takeaways have higher obesity rates → SUPPORTED")
+    print("   (p < 0.05)")
+else:
+    print("❌ H1: Areas with more takeaways have higher obesity rates → NOT SUPPORTED")
+    print(f"   (p = {model_a.pvalues[1]:.4f} > 0.05)")
+print("\n")
+
+if model_b.pvalues[1] >= 0.05 and model_b.pvalues[2] >= 0.05:
+    print("❌ H2: Deprivation explains the relationship → NOT SUPPORTED")
+    print("   Neither takeaway density nor deprivation is significant in Model B")
+elif model_b.pvalues[1] >= 0.05 and model_b.pvalues[2] < 0.05:
+    print("✅ H2: Deprivation explains the relationship → SUPPORTED")
+    print("   Takeaways are NOT significant when deprivation is added")
+elif model_b.pvalues[1] < 0.05 and model_b.pvalues[2] >= 0.05:
+    print("⚠️ H2: Deprivation explains the relationship → PARTIALLY SUPPORTED")
+    print("   Takeaways remain significant, deprivation is not")
+else:
+    print("⚠️ H2: Deprivation explains the relationship → INCONCLUSIVE")
+    print("   Both variables are significant in Model B")
+print("\n")
+
+# ---- 6. CONCLUSION ----
+print("7. CONCLUSION")
+print("-"*50)
+
+if model_a.pvalues[1] < 0.05:
+    print("The regression analysis shows a statistically significant relationship")
+    print("between takeaway density and obesity rates.")
+    if model_b.pvalues[1] < 0.05 and model_b.pvalues[2] < 0.05:
+        print("Both takeaway density and deprivation are significant predictors.")
+    elif model_b.pvalues[1] >= 0.05:
+        print("Deprivation appears to explain most of the relationship.")
+else:
+    print("The regression analysis did NOT find a statistically significant")
+    print("relationship between takeaway density and obesity rates.")
+    print("\nPossible reasons:")
+    print("  1. Small sample size (28 boroughs) – limited statistical power")
+    print("  2. Time mismatch between datasets (FHRS 2022, Obesity 2025)")
+    print("  3. Borough-level aggregation masks neighbourhood effects")
+    print("  4. Simple density measure does not capture takeaway quality")
+    print("\nThese results suggest the relationship between food environments")
+    print("and obesity is more complex than a simple density-outcome link.")
+
+print("\n")
+print("="*70)
+print(" "*25 + "The END")
+print("="*70)
+
