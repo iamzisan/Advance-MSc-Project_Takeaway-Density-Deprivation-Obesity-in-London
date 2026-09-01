@@ -38,6 +38,7 @@ print(f"NumPy version: {np.__version__}")
 
 
 # Load the FHRS ratings file
+#Dataset Link: https://www.kaggle.com/datasets/datota/uk-food-hygiene-rating-data-london?resource=download
 # Update this path to where you saved the file
 fhrs_df = pd.read_csv('/Users/zisan/My Docs/Projects and Research(Git)/MSC Project/Datasets/food_hygiene_rating_data.csv')
 
@@ -99,6 +100,8 @@ else:
 
 
 # Load ONSPD data with correct column names
+#Dataset Link: https://open-geography-portalx-ons.hub.arcgis.com/datasets/ons::ons-postcode-directory-february-2026-for-the-uk/about
+
 onspd_df = pd.read_csv('/Users/zisan/My Docs/Projects and Research(Git)/MSC Project/Datasets/ONSPD_FEB_2026_UK.csv')
 
 print("="*60)
@@ -144,6 +147,8 @@ onspd_df.head(10)
 
 
 # Load IMD File 7
+#Dataset Link: https://www.gov.uk/government/statistics/english-indices-of-deprivation-2019
+
 imd_df = pd.read_csv('/Users/zisan/My Docs/Projects and Research(Git)/MSC Project/Datasets/File_7_-_All_IoD2019_Scores__Ranks__Deciles_and_Population_Denominators_3 (1).csv')
 
 print("="*60)
@@ -173,7 +178,10 @@ imd_df.head(10)
 
 
 
-# Load adult obesity data 
+# Load adult obesity data
+
+# Dataset Link: https://fingertips.phe.org.uk/profile/obesity-physical-activity-nutrition/data#page/9/gid/1938133368/pat/159/par/K02000001/ati/15/are/E92000001/iid/93088/age/168/sex/4/cat/-1/ctp/-1/yrr/1/cid/4/tbm/1/page-options/car-do-0
+ 
 obesity_df = pd.read_csv('/Users/zisan/My Docs/Projects and Research(Git)/MSC Project/Datasets/indicator-93088-all-areas.data.csv')
 
 print("="*60)
@@ -228,7 +236,10 @@ obesity_df.head(10)
 
 
 
-# Load population data from Excel - CORRECTED
+# Load population data from Excel 
+
+Dataset Link: https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates
+
 population_df = pd.read_excel(
     '/Users/zisan/My Docs/Projects and Research(Git)/MSC Project/Datasets/mye24tablesew.xlsx',
     sheet_name='MYE2 - Persons',
