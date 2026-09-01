@@ -234,12 +234,6 @@ The project report contains a complete list of references. Key citations include
 
 ---
 
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
----
-
 ## 🙏 Acknowledgements
 
 - University of Hertfordshire, School of Physics, Engineering and Computer Science
